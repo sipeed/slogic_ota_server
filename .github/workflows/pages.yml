@@ -1,0 +1,61 @@
+# Test the update pages and publish them to GitHub Pages.
+#
+# Only the files the browser needs are published (see "Assemble the site");
+# tests, tools and the README stay in the repository. The public domain and
+# CDN in front of Pages are managed separately; the station policy in
+# src/station.js (STATION_ORIGIN) must name that public origin.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Let a running deploy finish rather than cancelling it.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Byte-exact replay against the reference flasher, the update flows,
+      # the batch engine, the firmware table and the asset hash stamps.
+      - name: Test
+        run: node --test test/*.test.mjs
+
+      - name: Assemble the site
+        run: |
+          mkdir _site
+          cp -r index.html batch.html style.css favicon.svg firmware.json src _site/
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

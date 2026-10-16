@@ -1,12 +1,28 @@
 # SLogic Firmware Update (web)
 
 Static web pages that update the application firmware (`app.bin`) of
-SLogic16U3 and SLogic32U3 over WebUSB:
+SLogic16U3 and SLogic32U3 over WebUSB. This repository is also the
+`tools/ota` submodule of [sipeed/SLogic](https://github.com/sipeed/SLogic),
+whose release notes read the firmware version table from it.
 
 - `index.html`: one device; select it, choose the file, click **Update firmware**.
 - `batch.html`: many boards in parallel for production (see below).
+- `firmware.json`: firmware version table (minimum / latest per model), served
+  with the pages so other tools can warn about old firmware.
 
 Light/dark theme and English/中文 included.
+
+## Deployment
+
+Every push to `main` runs the tests and publishes the site to GitHub Pages
+(`.github/workflows/pages.yml`); pull requests run the tests only. Only
+`index.html`, `batch.html`, `style.css`, `favicon.svg`, `firmware.json` and
+`src/` are published. The public domain and CDN in front of Pages are managed
+by operations. The batch page's browser policy allows exactly one origin,
+`STATION_ORIGIN` in `src/station.js` (currently `https://slogic.sipeed.com`):
+keep it equal to the public address the pages are served from. GitHub Pages
+sends `Access-Control-Allow-Origin: *`, so other sites can read
+`firmware.json`.
 
 ## Browser support
 
@@ -21,7 +37,6 @@ browsers. The page must be served over **https://** or from
 No build step; serve the directory as static files:
 
 ```sh
-cd tools/ota
 python3 serve.py          # http://localhost:8000 (this computer)
 python3 serve.py --lan    # https://<lan-ip>:8443 for colleagues on the LAN
 ```
@@ -30,8 +45,6 @@ USB access needs a secure page, and a plain `http://<lan-ip>` address is not
 one, so `--lan` serves HTTPS with a self-signed certificate (generated with
 openssl into `.certs/`, covering this computer's IPv4 addresses). Each visitor
 accepts the browser's certificate warning once.
-
-For a public deployment, publish the directory as is (e.g. GitHub Pages).
 
 After changing any file under `src/` or `style.css`, run `python3 stamp.py`:
 it puts content hashes into the asset URLs of both pages (an import map), so
@@ -138,7 +151,7 @@ unplugging boards) or `batch.html?demo=16u3`.
 ```text
 index.html, style.css, favicon.svg   the page
 firmware.json     firmware version table (min / latest per model); published
-                  with the pages, also used by build/scripts/release-notes
+                  with the pages, also read by sipeed/SLogic's release notes
 batch.html        batch update page
 src/app.js        page controller (UI state, progress, prompts)
 src/batch.js      batch page controller
@@ -151,13 +164,13 @@ src/usb.js        WebUSB bulk transport, RECONFIG request
 src/devices.js    model table, USB IDs, update parameters, file checks
 src/i18n.js       English / Chinese strings
 src/demo.js       ?demo: simulated WebUSB device and flash
-test/             node tests (node --test test/)
+test/             node tests (node --test test/*.test.mjs)
 ```
 
 ## Tests
 
 ```sh
-node --test test/
+node --test test/*.test.mjs
 ```
 
 - `replay.test.mjs` replays USB transcripts recorded from the reference Python
@@ -166,7 +179,7 @@ node --test test/
 
   ```sh
   python3 test/gen_transcript.py <SLogic16U3-tools dir> /tmp/t.json --size 0x10200 --write-chunk 48
-  EXTRA_TRANSCRIPTS=/tmp/t.json node --test test/
+  EXTRA_TRANSCRIPTS=/tmp/t.json node --test test/*.test.mjs
   ```
 - `updater.test.mjs` runs the whole update for both models against the demo
   device and checks the flash content.

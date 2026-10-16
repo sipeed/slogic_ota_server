@@ -1,7 +1,7 @@
 // Replays transcripts recorded from the reference Python flasher
 // (test/gen_transcript.py) and checks the web flasher sends identical bytes.
 //
-//   node --test test/
+//   node --test test/*.test.mjs
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ function load(name) {
 }
 
 // Extra transcripts (e.g. a multi-block image from gen_transcript.py --size
-// 0x10200): EXTRA_TRANSCRIPTS=/abs/a.json:/abs/b.json node --test test/
+// 0x10200): EXTRA_TRANSCRIPTS=/abs/a.json:/abs/b.json node --test test/*.test.mjs
 const extra = (process.env.EXTRA_TRANSCRIPTS ?? '').split(':').filter(Boolean);
 
 class ReplayLink {
