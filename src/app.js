@@ -97,9 +97,9 @@ function render() {
   if (device && info) {
     $('device-name').textContent = info.model.name;
     const pill = $('device-mode');
-    pill.replaceChildren(ledIcon(info.mode), info.mode === 'app' ? t('modeApp') : t('modeDfu'));
     pill.className = `pill ${info.mode}`;
-    $('device-led').replaceChildren(ledIcon(info.mode), info.mode === 'app' ? t('ledLegendApp') : t('ledLegendDfu'));
+    setLed(pill, info.mode, info.mode === 'app' ? t('modeApp') : t('modeDfu'));
+    setLed($('device-led'), info.mode, info.mode === 'app' ? t('ledLegendApp') : t('ledLegendDfu'));
     $('device-serial-row').hidden = !device.serialNumber || info.mode !== 'app';
     $('device-serial').textContent = device.serialNumber || '';
     $('device-usb').textContent = `${hex4(device.vendorId)}:${hex4(device.productId)}`;
@@ -151,13 +151,19 @@ function render() {
   const showSteps = state.busy || !!state.result;
   $('steps').hidden = !showSteps;
   if (showSteps) {
-    $('steps').replaceChildren(...STEPS.map((id) => {
-      const li = document.createElement('li');
-      li.textContent = t(STEP_LABEL[id]);
-      const s = state.stepState[id];
-      if (s) li.className = s;
-      return li;
-    }));
+    // Update the items in place: render() runs on every progress report, and
+    // replacing the elements would restart the active step's spinner each time.
+    const list = $('steps');
+    if (list.children.length !== STEPS.length) {
+      list.replaceChildren(...STEPS.map(() => document.createElement('li')));
+    }
+    STEPS.forEach((id, i) => {
+      const li = list.children[i];
+      const label = t(STEP_LABEL[id]);
+      if (li.textContent !== label) li.textContent = label;
+      const cls = state.stepState[id] ?? '';
+      if (li.className !== cls) li.className = cls;
+    });
   }
 
   const g = state.gesture;
@@ -180,6 +186,20 @@ function render() {
     $('result-title').textContent = r.title;
     $('result-body').textContent = r.body;
     $('result-btn').textContent = r.button;
+  }
+}
+
+/**
+ * LED icon + label in `el`. The icon is only rebuilt when the mode changes:
+ * render() runs on every progress report, and a new icon would restart the
+ * update-mode LED's blink each time.
+ */
+function setLed(el, mode, label) {
+  if (el.dataset.mode !== mode) {
+    el.dataset.mode = mode;
+    el.replaceChildren(ledIcon(mode), document.createTextNode(label));
+  } else if (el.lastChild.textContent !== label) {
+    el.lastChild.textContent = label;
   }
 }
 
