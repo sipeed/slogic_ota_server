@@ -71,7 +71,7 @@ export class SpiFlash {
   }
 
   /** Run `op` with the write latch set, then wait for WIP to clear. */
-  async withWriteEnable(op) {
+  async withWriteEnable(op, timeoutMs = this.wipTimeoutMs) {
     await this.spi.xfer(Uint8Array.of(0x06));
     try {
       await op();
@@ -86,7 +86,7 @@ export class SpiFlash {
         throw new FlashError('bus-hung', 'Flash status reads 0xFF: SPI bus not responding');
       }
       if (!(sr & 1)) break;
-      if (Date.now() - t0 > this.wipTimeoutMs) {
+      if (Date.now() - t0 > timeoutMs) {
         throw new FlashError('wip-timeout', 'Flash did not finish writing in time');
       }
     }
@@ -95,6 +95,16 @@ export class SpiFlash {
 
   eraseBlock(addr) {
     return this.withWriteEnable(() => this.spi.xfer(Uint8Array.of(0xd8, ...addr24(addr))));
+  }
+
+  /** 4 KiB sector erase (advanced mode). */
+  eraseSector(addr) {
+    return this.withWriteEnable(() => this.spi.xfer(Uint8Array.of(0x20, ...addr24(addr))));
+  }
+
+  /** Whole-chip erase (advanced mode); large parts take minutes. */
+  eraseChip() {
+    return this.withWriteEnable(() => this.spi.xfer(Uint8Array.of(0xc7)), 400000);
   }
 
   async program(addr, data, onProgress) {

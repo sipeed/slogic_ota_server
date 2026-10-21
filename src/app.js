@@ -6,6 +6,7 @@ import { AbortedError } from './flash.js';
 import { webUsbAvailable } from './usb.js';
 import { initLang, getLang, setLang, t } from './i18n.js';
 import { ledIcon } from './led.js';
+import { initAdvanced } from './advanced.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -34,6 +35,8 @@ const state = {
   deviceError: '',
 };
 
+let advanced = null; // advanced mode (raw flash tools), see advanced.js
+
 /* ------------------------------------------------------------------ prefs */
 
 function pref(key, value) {
@@ -56,6 +59,7 @@ function applyStrings() {
   document.documentElement.lang = getLang() === 'zh' ? 'zh-CN' : 'en';
   document.title = t('title');
   for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+  for (const el of document.querySelectorAll('[data-i18n-placeholder]')) el.placeholder = t(el.dataset.i18nPlaceholder);
   for (const el of document.querySelectorAll('[data-i18n-title]')) {
     el.title = t(el.dataset.i18nTitle);
     el.setAttribute('aria-label', el.title);
@@ -88,12 +92,13 @@ function render() {
     banner.hidden = true;
   }
 
-  // Device
+  // Device (the advanced flash tools hold the device while they run)
   const { device, info } = state;
+  const advBusy = advanced?.isBusy() ?? false;
   $('device-empty').hidden = !!device;
   $('device-info').hidden = !device;
-  $('connect').disabled = !state.usb || state.busy;
-  $('change').disabled = state.busy;
+  $('connect').disabled = !state.usb || state.busy || advBusy;
+  $('change').disabled = state.busy || advBusy;
   if (device && info) {
     $('device-name').textContent = info.model.name;
     const pill = $('device-mode');
@@ -144,7 +149,7 @@ function render() {
   $('ready').textContent = ready;
   $('ready').hidden = state.busy || !!state.result;
   $('start').hidden = state.busy || !!state.result;
-  $('start').disabled = !canStart || !state.usb;
+  $('start').disabled = !canStart || !state.usb || advBusy;
   $('cancel').hidden = !state.busy;
   $('keep').hidden = !state.busy;
 
@@ -187,6 +192,13 @@ function render() {
     $('result-body').textContent = r.body;
     $('result-btn').textContent = r.button;
   }
+
+  // Advanced mode replaces steps 2 and 3 with its flash tools
+  const adv = advanced?.isOn() ?? false;
+  $('card-file').hidden = adv;
+  $('card-update').hidden = adv;
+
+  advanced?.render();
 }
 
 /**
@@ -433,6 +445,7 @@ async function init() {
     state.usb = navigator.usb;
   }
   $('nav').href = `batch.html${DEMO ? '?demo' : ''}`;
+  advanced = initAdvanced({ state, log, render, selectDevice });
   applyStrings();
 
   $('lang').onclick = () => {
@@ -473,7 +486,8 @@ async function init() {
 
   if (!state.usb) return;
   state.usb.addEventListener('disconnect', (e) => {
-    if (!state.busy && e.device === state.device) {
+    // A mode switch from the flash tools also re-enumerates; they pick the new device themselves
+    if (!state.busy && !advanced?.isBusy() && e.device === state.device) {
       state.device = null;
       state.info = null;
       state.deviceError = t('deviceGone');
@@ -481,7 +495,7 @@ async function init() {
     }
   });
   state.usb.addEventListener('connect', (e) => {
-    if (!state.busy && !state.device) selectDevice(e.device);
+    if (!state.busy && !advanced?.isBusy() && !state.device) selectDevice(e.device);
   });
   const known = (await state.usb.getDevices()).filter((d) => identify(d));
   if (known.length) selectDevice(known.find((d) => identify(d).mode === 'dfu') ?? known[0]);

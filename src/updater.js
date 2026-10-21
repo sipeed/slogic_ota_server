@@ -101,7 +101,7 @@ export async function runUpdate({ usb, device, model, firmware, on, signal }) {
   return { restarted: true, appDevice: app ?? undefined };
 }
 
-async function openHealthy(usb, dfu, model, on, signal) {
+export async function openHealthy(usb, dfu, model, on, signal) {
   let link = await new UsbLink(dfu).open();
   if (await probe(link, model)) return link;
 

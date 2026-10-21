@@ -60,6 +60,12 @@ class FlashSim {
       case 0xd8:
         if (this.wel) { this.mem.fill(0xff, addr & ~0xffff, (addr & ~0xffff) + 0x10000); this.wip = 3; this.wel = false; }
         break;
+      case 0x20:
+        if (this.wel) { this.mem.fill(0xff, addr & ~0xfff, (addr & ~0xfff) + 0x1000); this.wip = 2; this.wel = false; }
+        break;
+      case 0xc7:
+        if (this.wel) { this.mem.fill(0xff); this.wip = 20; this.wel = false; }
+        break;
       case 0x02:
         if (this.wel) {
           wr.subarray(4).forEach((b, i) => { this.mem[(addr & ~0xff) | ((addr + i) & 0xff)] &= b; });

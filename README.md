@@ -55,6 +55,34 @@ stamp is out of date.
 simulates a device and its flash, so the whole flow can be previewed without
 hardware.
 
+## Advanced mode (flash tools)
+
+Ten quick clicks on the logo of `index.html` (within 3 seconds) toggle a
+hidden **Flash tools** card that replaces steps 2 and 3 (the log moves
+along); a reload leaves it. In update mode it reads,
+writes and erases the configuration flash at any offset over the same DFU
+bridge as the update (`src/flashops.js`, UI in `src/advanced.js`):
+
+- **Read** a range into a hex view (only the visible rows are drawn, so a
+  whole 16 MiB chip is fine), download it as `.bin`, or compare it with a file
+  (differing bytes are highlighted, with links to the first ones).
+- **Verify** the flash against a file: reads the file's length at an offset
+  and compares byte for byte (differences highlighted in the hex view).
+- **Write** a file at an offset. By default the 4 KiB sectors it touches are
+  erased first, the bytes of those sectors outside the range are read before
+  and written back, and the result is verified.
+- **Erase** a range: widened to 4 KiB sectors, 64 KiB blocks inside, chip
+  erase for the whole flash; optional blank check.
+
+Writes and erases ask for confirmation with the exact range. The flash map
+shows the selected range, what an erase will touch, the firmware file's
+area and the start addresses of the APP and DFU images (`flashAddr` /
+`dfuAddr` in `src/devices.js`; only starts, their lengths are not known);
+a write or erase that covers one of them is called out before it runs.
+Click 0x0 or an APP / DFU label on the map to use it as the offset; the
+chips under the length give common sizes. Offsets and lengths accept
+`0x10000`, `10000h`, `65536`, `64K`, `1M`.
+
 ## How an update works
 
 | Step | SLogic32U3 | SLogic16U3 |
@@ -159,6 +187,8 @@ src/batch-engine.js  batch logic: device tracking, parallel updates, board state
 src/led.js        status LED icon
 src/updater.js    the update sequence: mode switch, recovery, flash, restart
 src/flash.js      SPI NOR operations and erase/program/verify
+src/flashops.js   advanced mode: read / write / erase at any offset
+src/advanced.js   advanced mode UI (flash tools card, hex view)
 src/spi.js        USB-SPI bridge packets and registers
 src/usb.js        WebUSB bulk transport, RECONFIG request
 src/devices.js    model table, USB IDs, update parameters, file checks

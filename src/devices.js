@@ -13,6 +13,10 @@ export const MODELS = {
     // No USB RECONFIG request: the user switches modes on the device.
     reconfig: false,
     flashAddr: 0x0,
+    // Start of the update-mode (DFU) image in flash: the golden-image slot the
+    // production JTAG station wrote dfu.bin to (programmer.toml spiaddr).
+    // Only starts are shown in the advanced mode's map; lengths are not known.
+    dfuAddr: 0x800000,
     writeChunk: 12, // the 16U3 bridge FIFO fails at 16
     readChunk: 64,
     // Typical image sizes, only for a "wrong model?" warning.
@@ -25,6 +29,7 @@ export const MODELS = {
     dfuPid: 0x30f2,
     reconfig: true,
     flashAddr: 0x0,
+    dfuAddr: 0x800000,
     writeChunk: 48,
     readChunk: 64,
     typicalSize: [0x100000, 0x400000],

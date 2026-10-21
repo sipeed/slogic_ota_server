@@ -7,21 +7,23 @@
   <title>SLogic Firmware Update</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <!-- stamp:begin (python3 stamp.py) -->
-  <link rel="stylesheet" href="style.css?v=d9f1fc143f" />
+  <link rel="stylesheet" href="style.css?v=befb8d11b2" />
   <script type="importmap">
   {
     "imports": {
-      "./src/app.js": "./src/app.js?v=9f405de6c4",
+      "./src/advanced.js": "./src/advanced.js?v=94ed93fa5a",
+      "./src/app.js": "./src/app.js?v=e673857f01",
       "./src/batch-engine.js": "./src/batch-engine.js?v=88144eb621",
       "./src/batch.js": "./src/batch.js?v=3fd628ac70",
-      "./src/demo.js": "./src/demo.js?v=6256dd7941",
-      "./src/devices.js": "./src/devices.js?v=b0570fff1a",
-      "./src/flash.js": "./src/flash.js?v=630ea83707",
-      "./src/i18n.js": "./src/i18n.js?v=56431c68dd",
+      "./src/demo.js": "./src/demo.js?v=067ffcadd6",
+      "./src/devices.js": "./src/devices.js?v=357301b104",
+      "./src/flash.js": "./src/flash.js?v=6c2aca644d",
+      "./src/flashops.js": "./src/flashops.js?v=5a5ecdfdc4",
+      "./src/i18n.js": "./src/i18n.js?v=3aeb5cc583",
       "./src/led.js": "./src/led.js?v=f2646e4ce3",
       "./src/spi.js": "./src/spi.js?v=9cc90ac276",
       "./src/station.js": "./src/station.js?v=37ceee433b",
-      "./src/updater.js": "./src/updater.js?v=41e6a2a7e5",
+      "./src/updater.js": "./src/updater.js?v=dbcf4d4ec6",
       "./src/usb.js": "./src/usb.js?v=9a0263bf85"
     }
   }
@@ -38,12 +40,13 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+      <svg class="logo" id="logo" viewBox="0 0 32 32" aria-hidden="true">
         <rect x="1" y="1" width="30" height="30" rx="8" />
         <path d="M6 21h4v-10h4v10h4v-10h4v10h4" />
       </svg>
       <div>
-        <h1 data-i18n="title">SLogic Firmware Update</h1>
+        <h1><span data-i18n="title">SLogic Firmware Update</span>
+          <span id="adv-badge" class="adv-badge" hidden><span data-i18n="advBadge"></span><button id="adv-exit" type="button" data-i18n-title="advExit">×</button></span></h1>
         <p class="subtitle" data-i18n="subtitle"></p>
       </div>
     </div>
@@ -155,7 +158,149 @@
         <pre id="log"></pre>
       </details>
     </section>
+
+    <!-- Advanced: raw flash access (ten quick clicks on the logo) -->
+    <section class="card adv" id="card-adv" hidden>
+      <div class="card-head">
+        <span class="num adv-num" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg></span>
+        <h2 data-i18n="advTitle"></h2>
+        <span class="chip warn" data-i18n="advChip"></span>
+      </div>
+      <p class="note adv-intro" data-i18n="advIntro"></p>
+
+      <div class="adv-dev">
+        <div class="adv-dev-row">
+          <span id="adv-dev-state" class="adv-dev-state"></span>
+          <span class="adv-dev-actions">
+            <button id="adv-enter" class="ghost small" type="button" data-i18n="advEnter"></button>
+            <button id="adv-pick" class="ghost small" type="button" data-i18n="advPick"></button>
+            <button id="adv-info" class="ghost small" type="button" data-i18n="advInfo"></button>
+            <button id="adv-restart" class="ghost small" type="button" data-i18n="advRestart"></button>
+          </span>
+        </div>
+        <dl id="adv-facts" class="facts" hidden>
+          <div><dt data-i18n="advChipName"></dt><dd id="adv-chip"></dd></div>
+          <div><dt>JEDEC ID</dt><dd id="adv-jedec" class="mono"></dd></div>
+          <div><dt data-i18n="advCapacity"></dt><dd id="adv-cap"></dd></div>
+          <div><dt>UID</dt><dd id="adv-uid" class="mono"></dd></div>
+        </dl>
+      </div>
+
+      <div class="adv-map-wrap">
+        <div id="adv-map-labels" class="fm-labels" hidden></div>
+        <div id="adv-map" class="flash-map">
+          <div id="adv-map-app" class="fm-app" hidden></div>
+          <div id="adv-map-touch" class="fm-touch" hidden></div>
+          <div id="adv-map-sel" class="fm-sel" hidden></div>
+          <div id="adv-map-lines"></div>
+        </div>
+        <div class="fm-scale"><button id="adv-map-start" class="fm-start" type="button" data-addr="0" data-i18n-title="advSetOffset">0x000000</button><span class="fm-legend"><i class="k-sel"></i><span data-i18n="advMapSel"></span><i class="k-touch"></i><span data-i18n="advMapTouch"></span><i class="k-app"></i><span data-i18n="advMapApp"></span></span><span id="adv-map-end"></span></div>
+      </div>
+
+      <div class="adv-grid">
+        <div class="field">
+          <span class="label" data-i18n="advOp"></span>
+          <div id="adv-ops" class="segmented">
+            <button type="button" data-op="read" data-i18n="advRead"></button>
+            <button type="button" data-op="verify" data-i18n="advVerify"></button>
+            <button type="button" data-op="write" data-i18n="advWrite"></button>
+            <button type="button" data-op="erase" data-i18n="advErase"></button>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="adv-addr" data-i18n="advOffset"></label>
+          <input id="adv-addr" class="input mono" value="0x000000" spellcheck="false" autocomplete="off" />
+          <small id="adv-addr-hint" class="hint"></small>
+        </div>
+        <div class="field" id="adv-len-field">
+          <label class="label" for="adv-len" data-i18n="advLength"></label>
+          <input id="adv-len" class="input mono" value="0x1000" spellcheck="false" autocomplete="off" />
+          <small id="adv-len-hint" class="hint"></small>
+          <div class="chips mini presets">
+            <button type="button" class="chip-btn" data-len="256">256 B</button>
+            <button type="button" class="chip-btn" data-len="4096">4 KiB</button>
+            <button type="button" class="chip-btn" data-len="65536">64 KiB</button>
+            <button type="button" class="chip-btn" data-len="262144">256 KiB</button>
+            <button type="button" class="chip-btn" data-len="1048576">1 MiB</button>
+            <button type="button" class="chip-btn" data-len="2097152">2 MiB</button>
+            <button type="button" class="chip-btn" data-len="4194304">4 MiB</button>
+            <button type="button" class="chip-btn" data-len="8388608">8 MiB</button>
+            <button type="button" class="chip-btn" data-len="all" data-i18n="advPresetAll"></button>
+          </div>
+        </div>
+        <div class="field grow" id="adv-src-field">
+          <span class="label" id="adv-data-label" data-i18n="advData"></span>
+          <label id="adv-src-drop" class="drop compact">
+            <input id="adv-src-file" type="file" hidden />
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+            <span id="adv-src-name"></span>
+          </label>
+          <button id="adv-src-step2" class="link" type="button" data-i18n="advUseStep2"></button>
+        </div>
+      </div>
+
+      <div id="adv-danger" class="adv-danger" role="alert" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4.5M12 17.2v.3"/></svg>
+        <span id="adv-danger-text"></span>
+      </div>
+
+
+      <div class="adv-opts">
+        <label id="adv-opt-erase" class="ack"><input id="adv-erase" type="checkbox" checked /> <span data-i18n="advOptErase"></span></label>
+        <label id="adv-opt-preserve" class="ack"><input id="adv-preserve" type="checkbox" checked /> <span data-i18n="advOptPreserve"></span></label>
+        <label id="adv-opt-verify" class="ack"><input id="adv-verify" type="checkbox" checked /> <span data-i18n="advOptVerify"></span></label>
+        <label id="adv-opt-blank" class="ack"><input id="adv-blank" type="checkbox" checked /> <span data-i18n="advOptBlank"></span></label>
+      </div>
+
+      <div class="adv-run-row">
+        <div class="adv-sum-col">
+          <div id="adv-summary" class="adv-summary"></div>
+          <div id="adv-warn" class="adv-warn" hidden></div>
+        </div>
+        <div class="actions">
+          <button id="adv-run" class="primary" type="button"></button>
+          <button id="adv-cancel" class="ghost" type="button" data-i18n="cancel" hidden></button>
+        </div>
+      </div>
+
+      <div id="adv-progress" class="progress" hidden>
+        <div class="bar"><div id="adv-bar-fill" class="bar-fill"></div></div>
+        <div class="progress-meta"><span id="adv-progress-label"></span><span id="adv-progress-eta"></span></div>
+      </div>
+      <p id="adv-message" class="ok-text" hidden></p>
+      <p id="adv-error" class="error-text" hidden></p>
+
+      <div id="adv-result" class="hex-wrap" hidden>
+        <div class="hex-head">
+          <div class="hex-title"><strong id="adv-res-title"></strong><div id="adv-res-meta" class="file-meta mono"></div></div>
+          <div class="hex-tools">
+            <input id="adv-goto" class="input mono small" data-i18n-placeholder="advGoto" spellcheck="false" />
+            <button id="adv-cmp" class="ghost small" type="button" data-i18n="advCompare"></button>
+            <button id="adv-save" class="ghost small" type="button" data-i18n="advSave"></button>
+            <input id="adv-cmp-file" type="file" hidden />
+          </div>
+        </div>
+        <div id="adv-cmp-res" class="cmp" hidden></div>
+        <div id="adv-hex" class="hexview" tabindex="0">
+          <div id="adv-hex-spacer"></div>
+          <pre id="adv-hex-rows" class="hex-rows"></pre>
+        </div>
+      </div>
+
+      <dialog id="adv-confirm" class="dialog">
+        <div class="dialog-icon" aria-hidden="true">!</div>
+        <h3 id="adv-confirm-title"></h3>
+        <ul id="adv-confirm-body" class="mono"></ul>
+        <p class="note" data-i18n="advConfirmNote"></p>
+        <div class="dialog-actions">
+          <button id="adv-confirm-cancel" class="ghost" type="button" data-i18n="cancel"></button>
+          <button id="adv-confirm-ok" class="danger" type="button"></button>
+        </div>
+      </dialog>
+    </section>
   </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
 
   <footer>
     <span data-i18n="footer"></span><a id="wiki" target="_blank" rel="noopener" data-i18n="wiki"></a>
