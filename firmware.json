@@ -21,9 +21,12 @@
         "app": "359f:3031",
         "dfu": "359f:30f1"
       },
-      "min": null,
-      "latest": null,
-      "update_guide": null
+      "min": "202610230648",
+      "latest": "202610230648",
+      "update_guide": {
+        "en": "https://wiki.sipeed.com/hardware/en/logic_analyzer/slogic16u3/Hardware_Specification.html#Firmware-Update",
+        "zh": "https://wiki.sipeed.com/hardware/zh/logic_analyzer/slogic16u3/Hardware_Specification.html#%E6%9B%B4%E6%96%B0%E5%9B%BA%E4%BB%B6"
+      }
     }
   }
 }
