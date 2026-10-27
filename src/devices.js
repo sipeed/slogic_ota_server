@@ -10,8 +10,13 @@ export const MODELS = {
     name: 'SLogic16U3',
     appPid: 0x3031,
     dfuPid: 0x30f1,
-    // No USB RECONFIG request: the user switches modes on the device.
+    // RECONFIG (switch modes over USB): the application firmware takes it from
+    // S/N 202610230648; older firmware is switched with the MODE button. The
+    // update-mode side takes it only with the new DFU image (15k_usb_dfu-
+    // 202610221618), which the page cannot see, so after an update it tries a
+    // restart and asks for a replug if the board stays in update mode.
     reconfig: false,
+    reconfigSince: '202610230648',
     flashAddr: 0x0,
     // Start of the update-mode (DFU) image in flash: the golden-image slot the
     // production JTAG station wrote dfu.bin to (programmer.toml spiaddr).
@@ -35,6 +40,21 @@ export const MODELS = {
     typicalSize: [0x100000, 0x400000],
   },
 };
+
+/**
+ * Whether the page can switch this board from normal to update mode over USB:
+ * always for the SLogic32U3, from `reconfigSince` for the SLogic16U3 (its
+ * normal-mode USB serial is the firmware version).
+ */
+export function canEnterUpdateMode(model, serial) {
+  if (model.reconfig) return true;
+  return !!(model.reconfigSince && serial && serial >= model.reconfigSince);
+}
+
+/** Whether to try a USB restart from update mode (it may not take: old DFU image). */
+export function canTryRestart(model) {
+  return model.reconfig || !!model.reconfigSince;
+}
 
 export const USB_FILTERS = Object.values(MODELS).flatMap((m) => [
   { vendorId: VID, productId: m.appPid },

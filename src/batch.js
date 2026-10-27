@@ -1,6 +1,6 @@
 // Batch page controller.
 
-import { MODELS, USB_FILTERS, inspectFirmware } from './devices.js';
+import { MODELS, USB_FILTERS, inspectFirmware, canTryRestart } from './devices.js';
 import { BatchEngine, ACTIVE, MAX_ATTEMPTS } from './batch-engine.js';
 import { webUsbAvailable } from './usb.js';
 import { initLang, getLang, setLang, t } from './i18n.js';
@@ -72,7 +72,7 @@ function render() {
     b.setAttribute('aria-checked', on);
     b.disabled = !!e?.running;
   }
-  $('update-normal-row').hidden = !model.reconfig;
+  $('update-normal-row').hidden = !canTryRestart(model); // models that can switch over USB (16U3: newer firmware)
   $('update-normal').disabled = !!e?.running;
 
   const f = state.file;

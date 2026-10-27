@@ -5,20 +5,26 @@
 // is a new device to the browser, so when it isn't already authorized the
 // update pauses and asks the UI for one click (`gesture`), then continues.
 
-import { DFU_FILTERS, identify } from './devices.js';
+import { DFU_FILTERS, identify, canEnterUpdateMode, canTryRestart } from './devices.js';
 import { UsbLink, sendReconfig } from './usb.js';
 import { SpiFlash, flashFirmware, FlashError } from './flash.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// How long a board that is expected to restart may stay in update mode before
+// the page concludes it did not take the request (its re-enumeration takes ~1 s).
+const STAY_MS = 5000;
+
 /**
  * Poll the authorized devices until `match` finds one. Gives up after
  * `timeoutMs`, or `graceMs` after `old` (the device that is re-enumerating)
  * has left the bus: an unauthorized new device never shows up here, so there
- * is no point in waiting longer before asking the user.
+ * is no point in waiting longer before asking the user. With `stayMs`, also
+ * gives up when `old` is still on the bus after that long (it ignored the request).
  */
-export async function waitForDevice(usb, match, timeoutMs, signal, { old, graceMs = 2500 } = {}) {
-  const end = Date.now() + timeoutMs;
+export async function waitForDevice(usb, match, timeoutMs, signal, { old, graceMs = 2500, stayMs = 0 } = {}) {
+  const start = Date.now();
+  const end = start + timeoutMs;
   let goneAt = 0;
   for (;;) {
     const devices = await usb.getDevices();
@@ -27,6 +33,8 @@ export async function waitForDevice(usb, match, timeoutMs, signal, { old, graceM
     if (old && !goneAt && !devices.includes(old)) goneAt = Date.now();
     if (Date.now() > end || signal?.aborted) return null;
     if (goneAt && Date.now() - goneAt > graceMs) return null;
+    // `old` never left: it did not take the request
+    if (stayMs && old && !goneAt && Date.now() - start > stayMs) return null;
     await sleep(300);
   }
 }
@@ -47,7 +55,7 @@ export async function runUpdate({ usb, device, model, firmware, on, signal }) {
   // 1. Enter update (DFU) mode.
   if (info.mode === 'app') {
     on.step('switch', 'active');
-    if (model.reconfig) {
+    if (canEnterUpdateMode(model, device.serialNumber)) {
       on.log(`Sending RECONFIG to ${model.name} (APP mode)`);
       await sendReconfig(device);
       dfu = await waitForDevice(usb, (d) => identify(d, model)?.mode === 'dfu', 15000, signal,
@@ -88,14 +96,20 @@ export async function runUpdate({ usb, device, model, firmware, on, signal }) {
 
   // 4. Back to the application.
   on.step('restart', 'active');
-  if (!target.reconfig) {
+  if (!canTryRestart(target)) {
     on.step('restart', 'manual');
     return { restarted: false };
   }
   on.log('Sending RECONFIG to restart into the application');
   await sendReconfig(dfu);
   const app = await waitForDevice(usb, (d) => identify(d, target)?.mode === 'app', 15000, signal,
-    { old: dfu, graceMs: 4000 });
+    { old: dfu, graceMs: 4000, stayMs: target.reconfig ? 0 : STAY_MS });
+  // A SLogic16U3 with an old update-mode image ignores the request and stays.
+  if (!app && !target.reconfig && (await usb.getDevices()).includes(dfu)) {
+    on.log('The board stayed in update mode (older update-mode image); asking for a replug');
+    on.step('restart', 'manual');
+    return { restarted: false };
+  }
   on.step('restart', 'done');
   if (app) on.device?.(app);
   return { restarted: true, appDevice: app ?? undefined };

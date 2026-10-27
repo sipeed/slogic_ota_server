@@ -19,7 +19,7 @@
 // automatically while the board stays connected, and when nothing else is in
 // progress every blinking board is a failed one.
 
-import { identify } from './devices.js';
+import { identify, canEnterUpdateMode, canTryRestart } from './devices.js';
 import { UsbLink, sendReconfig } from './usb.js';
 import { SpiFlash, flashFirmware } from './flash.js';
 import { probe } from './updater.js';
@@ -35,6 +35,8 @@ import { probe } from './updater.js';
 export const ACTIVE = new Set(['switching', 'flashing', 'restarting', 'retrying']);
 
 const REENUM_TIMEOUT_MS = 20000;
+// A SLogic16U3 with an old update-mode image ignores the restart request and stays.
+const STAY_MS = 5000;
 const MAX_REMOVED_ROWS = 12;
 export const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 1500;
@@ -197,8 +199,9 @@ export class BatchEngine extends EventTarget {
       if (this.targetSerial && b.serial === this.targetSerial) {
         return this.set(b, 'done', 'already');
       }
-      if (this.running && this.updateNormal && b.model.reconfig) return this.switchToDfu(b);
-      return this.set(b, 'waiting', b.model.reconfig ? '' : 'press-mode');
+      const auto = canEnterUpdateMode(b.model, b.serial);
+      if (this.running && this.updateNormal && auto) return this.switchToDfu(b);
+      return this.set(b, 'waiting', auto ? '' : 'press-mode');
     }
     if (this.running && this.firmware) return this.flash(b);
     return this.set(b, 'ready');
@@ -302,12 +305,21 @@ export class BatchEngine extends EventTarget {
 
   /** Written and verified: restart into the application, or ask for a replug. */
   async afterWrite(b) {
-    if (!b.model.reconfig) {
+    if (!canTryRestart(b.model)) {
       return this.set(b, 'done', 'replug');
     }
     this.set(b, 'restarting');
     b.since = Date.now();
-    try { await sendReconfig(b.device); } catch { /* it restarts anyway */ }
+    const dfu = b.device;
+    try { await sendReconfig(dfu); } catch { /* it restarts anyway */ }
+    if (!b.model.reconfig) {
+      setTimeout(async () => {
+        if (b.state === 'restarting' && b.device === dfu && (await this.usb.getDevices()).includes(dfu)) {
+          this.log(`Board #${b.id}: stayed in update mode (older update-mode image)`);
+          this.set(b, 'done', 'replug');
+        }
+      }, STAY_MS);
+    }
     // Without a policy the restarted board may not be visible; it is verified,
     // so count it as done.
     b.timer = setTimeout(() => {

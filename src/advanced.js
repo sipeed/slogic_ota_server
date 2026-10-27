@@ -2,7 +2,7 @@
 // configuration flash at any offset. Hidden by default; ten quick clicks on
 // the logo toggle it (not remembered across reloads).
 
-import { DFU_FILTERS, identify } from './devices.js';
+import { DFU_FILTERS, identify, canEnterUpdateMode, canTryRestart } from './devices.js';
 import { sendReconfig } from './usb.js';
 import { openHealthy, waitForDevice } from './updater.js';
 import { FlashError, AbortedError } from './flash.js';
@@ -224,7 +224,7 @@ async function enterDfu() {
   const m = model();
   if (!state.device || !m) return;
   adv.error = '';
-  if (!m.reconfig) { adv.needPick = true; render(); return; }
+  if (!canEnterUpdateMode(m, state.device.serialNumber)) { adv.needPick = true; render(); return; }
   adv.busy = true;
   render();
   try {
@@ -255,15 +255,16 @@ async function pickDfu() {
 async function restartApp() {
   const { state } = ctx;
   const m = model();
-  if (!state.device || !m?.reconfig) return;
+  if (!state.device || !m || !canTryRestart(m)) return;
   adv.busy = true;
   render();
   try {
     ctx.log('Advanced: sending RECONFIG to restart into the application');
     await sendReconfig(state.device);
     const app = await waitForDevice(state.usb, (d) => identify(d, m)?.mode === 'app', 15000, null,
-      { old: state.device, graceMs: 4000 });
+      { old: state.device, graceMs: 4000, stayMs: m.reconfig ? 0 : 5000 });
     if (app) ctx.selectDevice(app);
+    else if ((await state.usb.getDevices()).includes(state.device)) adv.error = t('advReplugToApp', { model: m.name });
   } catch (e) {
     adv.error = e.message;
   } finally {
@@ -496,14 +497,15 @@ function render() {
 
   // Device line
   let devText;
+  const auto = m && state.device && canEnterUpdateMode(m, state.device.serialNumber);
   if (!state.device) devText = t('advNoDevice');
-  else if (!dfu) devText = t(m?.reconfig ? 'advNeedDfu32' : 'advNeedDfu16', { model: m.name });
+  else if (!dfu) devText = t(auto ? 'advNeedDfu32' : 'advNeedDfu16', { model: m.name });
   else devText = t('advReady', { model: m.name });
   $('adv-dev-state').textContent = devText;
   $('adv-dev-state').className = `adv-dev-state ${dfu ? 'ok' : ''}`;
-  $('adv-enter').hidden = !state.device || dfu || !m?.reconfig;
-  $('adv-pick').hidden = !(adv.needPick || (state.device && !dfu && !m?.reconfig));
-  $('adv-restart').hidden = !dfu || !m?.reconfig;
+  $('adv-enter').hidden = !state.device || dfu || !auto;
+  $('adv-pick').hidden = !(adv.needPick || (state.device && !dfu && !auto));
+  $('adv-restart').hidden = !dfu || !m || !canTryRestart(m);
   $('adv-info').hidden = !dfu;
   for (const id of ['adv-enter', 'adv-pick', 'adv-restart', 'adv-info']) $(id).disabled = busy;
   $('adv-exit').disabled = adv.busy;

@@ -80,6 +80,25 @@ test('SLogic16U3 batch: update-mode boards are flashed and marked for a replug; 
   engine.detach();
 });
 
+test('SLogic16U3 batch, new firmware: switched and restarted over USB; an older update-mode image asks for a replug', async () => {
+  const usb = demoUsb('16u3-new', { permitAll: true, boards: 0 });
+  usb.plug('slogic16u3', 'app', true);           // 202610230648, new update-mode image
+  usb.newDfu = false;
+  usb.plug('slogic16u3', 'app', true);           // 202610230648, older update-mode image
+  usb.appSerial = '202610140927';
+  usb.plug('slogic16u3', 'app', true);           // older firmware: MODE button
+  const engine = new BatchEngine({ usb });
+  await engine.attach();
+  engine.configure({ model: MODELS.slogic16u3, firmware: image(40000), updateNormal: true });
+  engine.start();
+  await until(engine, () => engine.boards[0].state === 'done' && engine.boards[1].state === 'done');
+  assert.equal(engine.boards[0].message, '', 'restarted over USB');
+  assert.equal(engine.boards[1].message, 'replug');
+  assert.equal(engine.boards[2].state, 'waiting');
+  assert.equal(engine.boards[2].message, 'press-mode');
+  engine.detach();
+});
+
 async function batch(modelId, firmwareSize = 40000) {
   const usb = demoUsb(modelId === 'slogic16u3' ? '16u3' : '32u3', { permitAll: true, boards: 0 });
   const engine = new BatchEngine({ usb });

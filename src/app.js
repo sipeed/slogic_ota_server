@@ -1,6 +1,6 @@
 // Page controller: device selection, firmware file, the update run.
 
-import { USB_FILTERS, DFU_FILTERS, identify, inspectFirmware } from './devices.js';
+import { USB_FILTERS, DFU_FILTERS, identify, inspectFirmware, canEnterUpdateMode } from './devices.js';
 import { runUpdate, hex4 } from './updater.js';
 import { AbortedError } from './flash.js';
 import { webUsbAvailable } from './usb.js';
@@ -108,7 +108,8 @@ function render() {
     $('device-serial-row').hidden = !device.serialNumber || info.mode !== 'app';
     $('device-serial').textContent = device.serialNumber || '';
     $('device-usb').textContent = `${hex4(device.vendorId)}:${hex4(device.productId)}`;
-    const note = info.mode === 'app' && !info.model.reconfig ? t('manualDfuNote16') : '';
+    const note = info.mode === 'app' && !canEnterUpdateMode(info.model, device.serialNumber)
+      ? t('manualDfuNote16') : '';
     $('device-note').hidden = !note;
     $('device-note').textContent = note;
   }

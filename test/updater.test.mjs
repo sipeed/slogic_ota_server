@@ -13,8 +13,8 @@ function image(size) {
   return fw;
 }
 
-async function update(param, size) {
-  const usb = demoUsb(param);
+async function update(param, size, options) {
+  const usb = demoUsb(param, options);
   const device = await usb.requestDevice({ filters: USB_FILTERS });
   const { model } = identify(device);
   const steps = [];
@@ -49,6 +49,21 @@ test('SLogic32U3: RECONFIG into update mode, flash, restart into the app', async
 test('SLogic16U3: manual switch to update mode, then a manual replug', async () => {
   const { result, steps, gestures } = await update('16u3', 70000);
   assert.deepEqual(gestures, ['manual-dfu']);
+  assert.deepEqual(steps.slice(-2), ['restart:active', 'restart:manual']);
+  assert.equal(result.restarted, false);
+});
+
+test('SLogic16U3 from 202610230648 with the new update-mode image: both switches over USB', async () => {
+  const { result, steps, gestures } = await update('16u3-new', 70000);
+  assert.deepEqual(gestures, ['authorize-dfu']); // no MODE button: only the browser's chooser
+  assert.deepEqual(steps.slice(-2), ['restart:active', 'restart:done']);
+  assert.equal(result.restarted, true);
+  assert.equal(result.appDevice?.serialNumber, '202610230648');
+});
+
+test('SLogic16U3 from 202610230648 with an older update-mode image: auto switch in, replug out', async () => {
+  const { result, steps, gestures } = await update('16u3-new', 70000, { newDfu: false });
+  assert.deepEqual(gestures, ['authorize-dfu']);
   assert.deepEqual(steps.slice(-2), ['restart:active', 'restart:manual']);
   assert.equal(result.restarted, false);
 });

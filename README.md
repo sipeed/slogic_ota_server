@@ -87,10 +87,10 @@ chips under the length give common sizes. Offsets and lengths accept
 
 | Step | SLogic32U3 | SLogic16U3 |
 |---|---|---|
-| Enter update mode (DFU) | automatic: USB RECONFIG request | user presses MODE |
+| Enter update mode (DFU) | automatic: USB RECONFIG request | automatic from firmware 202610230648; older firmware: user presses MODE |
 | Check flash | bridge reset, JEDEC ID, flash size check | same |
 | Erase / blank check / write / verify | 64 KiB erases, read back blank, page program (48 B per transaction), full read-back compare | same, 12 B per transaction |
-| Restart | automatic: USB RECONFIG request | user re-plugs |
+| Restart | automatic: USB RECONFIG request | tried over USB; works with the update-mode image 15k_usb_dfu-202610221618, otherwise (board stays in update mode for 5 s) the page asks for a re-plug |
 
 | Mode | USB ID |
 |---|---|
@@ -103,7 +103,15 @@ number, so the browser cannot remember it: each update asks for one extra click
 ("Select update-mode device"). Everything else runs on its own.
 
 Measured on an SLogic32U3 (Linux, 1.7 MB image): about 40 s in total, of
-which erase 2 s, blank check 6 s, write 24 s, verify 6 s.
+which erase 2 s, blank check 6 s, write 24 s, verify 6 s. On an SLogic16U3
+with firmware 202610230648 and the new update-mode image (0.5 MB image): 31 s,
+switching both ways over USB.
+
+The page cannot read the update-mode image's version (the device reports no
+serial number in update mode), so for a SLogic16U3 it decides from the
+normal-mode firmware (`reconfigSince` in `src/devices.js`) whether to switch
+in over USB, and finds out at the restart whether the update-mode image takes
+the request. `?demo=16u3-new` simulates such a board.
 
 The flash protocol (USB-SPI bridge packets, SPI NOR commands, chunk sizes) is
 taken from the production flasher in the SLogic production-test tools

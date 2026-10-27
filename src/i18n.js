@@ -29,7 +29,7 @@ const STRINGS = {
     serial: 'Firmware S/N',
     deviceGone: 'The device was disconnected.',
     deviceBusy: 'The device is in use by another program. Close SLogicView, PulseView, AllLogic, ngscopeclient or sigrok-cli and try again.',
-    manualDfuNote16: 'SLogic16U3 is switched to update mode with its MODE button; the page will guide you.',
+    manualDfuNote16: 'With this firmware, SLogic16U3 is switched to update mode with its MODE button; the page will guide you.',
 
     helpTitle: 'Device not in the list?',
     helpCable: 'Use a USB data cable plugged directly into the computer (not a charging-only cable or an unpowered hub).',
@@ -210,6 +210,7 @@ const STRINGS = {
     advNoDevice: 'Select a device in step 1.',
     advNeedDfu32: '{model} is in normal mode; flash access needs update mode.',
     advNeedDfu16: '{model} is in normal mode: hold its MODE button to switch to update mode, then select it.',
+    advReplugToApp: 'The {model} stayed in update mode (older update-mode image): unplug it and plug it back in.',
     advReady: '{model} in update mode: ready.',
     advReplug: 'The update-mode device does not respond. Re-plug it and select it again.',
     advReadDone: 'Read {size} in {time}.',
@@ -261,7 +262,7 @@ const STRINGS = {
     serial: '固件 S/N',
     deviceGone: '设备已断开。',
     deviceBusy: '设备正被其他程序占用。请关闭 SLogicView、PulseView、AllLogic、ngscopeclient 或 sigrok-cli 后重试。',
-    manualDfuNote16: 'SLogic16U3 需通过设备上的 MODE 按键进入升级模式，页面会给出提示。',
+    manualDfuNote16: '当前固件的 SLogic16U3 需通过设备上的 MODE 按键进入升级模式，页面会给出提示。',
 
     helpTitle: '列表里找不到设备？',
     helpCable: '请使用支持数据传输的 USB 线并直接连接电脑（不要用仅充电线或无供电的集线器）。',
@@ -441,6 +442,7 @@ const STRINGS = {
     advNoDevice: '请先在第 1 步选择设备。',
     advNeedDfu32: '{model} 处于正常模式；读写 Flash 需要进入升级模式。',
     advNeedDfu16: '{model} 处于正常模式：按住 MODE 键切换到升级模式，然后选择设备。',
+    advReplugToApp: '{model} 仍停留在升级模式（升级模式固件较旧）：请拔下后重新插入。',
     advReady: '{model} 已在升级模式，可以操作。',
     advReplug: '升级模式设备无响应。请重新插拔后再选择设备。',
     advReadDone: '已读取 {size}，用时 {time}。',

@@ -3,7 +3,7 @@
 // update can be tried and tested without hardware. Nothing here runs unless
 // the page is opened with ?demo.
 
-import { MODELS, VID } from './devices.js';
+import { MODELS, VID, canEnterUpdateMode } from './devices.js';
 import { CMD_SET_REGISTER, CMD_READ_REGISTER, CMD_READ_DATA } from './spi.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -145,7 +145,11 @@ class DemoDevice {
   }
 
   async controlTransferOut(setup) {
-    if (setup.request === 0x30 && setup.index === 0x5253 && this.model.reconfig) {
+    // RECONFIG: always on a SLogic32U3; on a SLogic16U3 from firmware
+    // reconfigSince in normal mode, and in update mode only with the new image.
+    const takes = this.mode === 'app' ? canEnterUpdateMode(this.model, this.serialNumber)
+      : this.model.reconfig || this.board.newDfu;
+    if (setup.request === 0x30 && setup.index === 0x5253 && takes) {
       setTimeout(() => this.bus.replace(this, this.mode === 'app' ? 'dfu' : 'app'), 600);
       throw new DOMException('device gone', 'NetworkError');
     }
@@ -158,8 +162,15 @@ class DemoDevice {
  * that pre-authorizes SLogic devices for a production station.
  */
 class DemoUsb extends EventTarget {
-  constructor(modelId, { mode = 'app', permitAll = false, boards = 1 } = {}) {
+  /**
+   * `appSerial`: normal-mode firmware S/N (a 16U3 switches over USB from
+   * 202610230648); `newDfu`: the update-mode image restarts over USB too.
+   */
+  constructor(modelId, { mode = 'app', permitAll = false, boards = 1,
+    appSerial = '202610140927', newDfu = false } = {}) {
     super();
+    this.appSerial = appSerial;
+    this.newDfu = newDfu;
     this.permitAll = permitAll;
     this.permitted = new Set();
     this.devices = [];
@@ -172,9 +183,10 @@ class DemoUsb extends EventTarget {
 
   /** Connect a new board. */
   plug(modelId, mode = 'dfu', quiet = false) {
-    const board = { model: MODELS[modelId], flash: new FlashSim(), failIn: 0, failRepeat: 0 };
+    const board = { model: MODELS[modelId], flash: new FlashSim(), failIn: 0, failRepeat: 0,
+      appSerial: this.appSerial, newDfu: this.newDfu };
     this.boards.push(board);
-    const d = new DemoDevice(this, board, mode, mode === 'app' ? '202610140927' : '');
+    const d = new DemoDevice(this, board, mode, mode === 'app' ? board.appSerial : '');
     this.devices.push(d);
     if (!quiet && this.allowed(d)) this.dispatch('connect', d);
     return d;
@@ -205,11 +217,11 @@ class DemoUsb extends EventTarget {
 
   async requestDevice({ filters }) {
     await sleep(150);
-    // A 16U3 has no RECONFIG: asking for its update-mode device stands in for
-    // the user pressing MODE.
+    // A board without RECONFIG (16U3, older firmware): asking for its
+    // update-mode device stands in for the user pressing MODE.
     const wantsDfu = filters.every((f) => Object.values(MODELS).some((m) => m.dfuPid === f.productId));
     const app = this.devices.find((d) => d.mode === 'app');
-    if (wantsDfu && app && !app.model.reconfig) this.replace(app, 'dfu', true);
+    if (wantsDfu && app && !canEnterUpdateMode(app.model, app.serialNumber)) this.replace(app, 'dfu', true);
     const d = this.devices.find((x) => filters.some((f) => f.productId === x.productId));
     if (!d) throw new DOMException('No device selected.', 'NotFoundError');
     this.permitted.add(d.productId);
@@ -220,7 +232,8 @@ class DemoUsb extends EventTarget {
     this.devices = this.devices.filter((d) => d !== old);
     old.gone = true;
     if (!quiet) this.dispatch('disconnect', old);
-    const serial = mode === 'app' ? '202610150930' : '';
+    const updated = old.board.appSerial > '202610150930' ? old.board.appSerial : '202610150930';
+    const serial = mode === 'app' ? updated : '';
     const d = new DemoDevice(this, old.board, mode, serial);
     this.devices.push(d);
     // The update-mode device stays authorized only after the first chooser pick.
@@ -234,7 +247,11 @@ class DemoUsb extends EventTarget {
   }
 }
 
+/** ?demo (32U3), ?demo=16u3 (older firmware: MODE button), ?demo=16u3-new (USB switching). */
 export function demoUsb(param, options) {
+  if (param === '16u3-new') {
+    return new DemoUsb('slogic16u3', { appSerial: '202610230648', newDfu: true, ...options });
+  }
   return new DemoUsb(param === '16u3' ? 'slogic16u3' : 'slogic32u3', options);
 }
 
